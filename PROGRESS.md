@@ -1,6 +1,6 @@
 # Cuentas Claras API — Checkpoint de Desarrollo
 
-> Estado guardado al **10 de agosto de 2026**. Este archivo documenta el avance para poder retomar el trabajo en otra sesión.
+> Estado guardado al **26 de agosto de 2026**. Este archivo documenta el avance para poder retomar el trabajo en otra sesión.
 
 ## Fase actual
 
@@ -27,6 +27,7 @@
   - `infrastructure/`
   - `interface/`
   - `app.ts` y `server.ts`
+- `.gitignore` creado: excluye `node_modules/`, `dist/`, `.env`, logs, editores.
 
 ### Código verificado
 - `src/app.ts`: instancia Express + `app.use(express.json())`, export default.
@@ -40,6 +41,22 @@
 - Contenedor **arriba y corriendo** (verificado con `docker compose ps`).
 - Credenciales de dev: `POSTGRES_USER=admin`, `POSTGRES_PASSWORD=1144066482`, `POSTGRES_DB=cuentasclaras_dev`.
 
+### Prisma
+- `prisma/schema.prisma` creado con **6 modelos** y relaciones definidas:
+  - **User**: id (UUID), email (unique), name, password, createdAt, updatedAt.
+  - **Household**: id (UUID), name, createdAt, updatedAt.
+  - **HouseholdMember**: relación N:M User-Household con campo `role` (admin | member). Constraint @@unique([userId, householdId]).
+  - **Expense**: id (UUID), description, amount (Int, pesos COP), paidBy (userId), date, householdId. Relación con Household y User.
+  - **ExpenseSplit**: composite key [expenseId, userId], amount (Int), paid (Boolean). Divide un gasto entre usuarios.
+  - **Settlement**: id (UUID), amount (Int), from (userId deudor), to (userId acreedor), settled (Boolean), createdAt, updatedAt. Relaciones self-referencing con User.
+- `.env` creado con `DATABASE_URL` apuntando a `localhost:4000`.
+
+## Pendientes / Próximo paso
+
+- [ ] Generar la primera migración de Prisma (`npx prisma migrate dev`).
+- [ ] Verificar que la migración crea las tablas correctamente en la BD.
+- [ ] Luego: Fase 2 (dominio + manejo de errores), Fase 3 (auth)...
+
 ## Decisiones de arquitectura (para no re-discutir)
 
 - ESM nativo (`"type": "module"`) + `module: "nodenext"` → imports relativos con extensión `.js` (`import app from './app.js'`).
@@ -47,13 +64,8 @@
 - Separación `app.ts` (config Express, exportada para tests) vs `server.ts` (bootstrap con `listen`).
 - BD en contenedor es solo para dev; producción usará servicio en la nube. Solo cambia la `DATABASE_URL`.
 - Logs en español, consistencia con el proyecto.
-
-## Pendientes / Próximo paso
-
-- [ ] **Prisma**: crear `schema.prisma` con los modelos del dominio (`User`, `Household`, `Expense`, `Settlements`), definir relaciones y generar la primera migración.
-- [ ] Configurar `DATABASE_URL` (apuntando a `localhost:4000`).
-- [ ] `.gitignore` (node_modules, dist, .env).
-- [ ] Luego: Fase 2 (dominio + manejo de errores), Fase 3 (auth)...
+- Dinero como `Int` en pesos COP (sin decimales).
+- IDs como UUID v4.
 
 ## Recordatorios
 

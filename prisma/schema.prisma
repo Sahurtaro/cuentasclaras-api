@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  households   HouseholdMember[]
+  expenses     Expense[]
+  settlements  Settlement[]
+  splits ExpenseSplit[]
+}
+
+model Household {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members  HouseholdMember[]
+  expenses Expense[]
+}
+
+model HouseholdMember {
+  id          String   @id @default(uuid())
+  role        String   @default("member") // admin | member
+  joinedAt    DateTime @default(now())
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, householdId])
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  description String
+  amount      Int
+  paidBy      String   // userId de quien pagó
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  paidByUser  User      @relation(fields: [paidBy], references: [id], onDelete: Cascade)
+  splits ExpenseSplit[]
+}
+
+model ExpenseSplit {
+  @@id([expenseId, userId])
+  amount Int
+  paid Boolean @default(false)
+  expenseId String
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+}
+
+model Settlement {
+  id        String   @id @default(uuid())
+  amount    Int
+  from      String   // userId que debe
+  to        String   // userId a quien se le debe
+  settled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fromUser  User     @relation("SettlementFrom", fields: [from], references: [id], onDelete: Cascade)
+  toUser    User     @relation("SettlementTo", fields: [to], references: [id], onDelete: Cascade)
+}
