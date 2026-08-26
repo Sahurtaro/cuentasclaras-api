@@ -17,7 +17,8 @@ model User {
 
   households   HouseholdMember[]
   expenses     Expense[]
-  settlements  Settlement[]
+  settlementsAsFrom  Settlement[] @relation("SettlementFrom")
+  settlementsAsTo    Settlement[] @relation("SettlementTo")
   splits ExpenseSplit[]
 }
 

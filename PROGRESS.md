@@ -4,7 +4,7 @@
 
 ## Fase actual
 
-**Fase 1: Setup y Base de Datos** — en curso.
+**Fase 1: Setup y Base de Datos** — completada.
 
 ## Completado ✅
 
@@ -48,13 +48,13 @@
   - **HouseholdMember**: relación N:M User-Household con campo `role` (admin | member). Constraint @@unique([userId, householdId]).
   - **Expense**: id (UUID), description, amount (Int, pesos COP), paidBy (userId), date, householdId. Relación con Household y User.
   - **ExpenseSplit**: composite key [expenseId, userId], amount (Int), paid (Boolean). Divide un gasto entre usuarios.
-  - **Settlement**: id (UUID), amount (Int), from (userId deudor), to (userId acreedor), settled (Boolean), createdAt, updatedAt. Relaciones self-referencing con User.
+  - **Settlement**: id (UUID), amount (Int), from (userId deudor), to (userId acreedor), settled (Boolean), createdAt, updatedAt. Relaciones self-referencing con User (`settlementsAsFrom`, `settlementsAsTo`).
 - `.env` creado con `DATABASE_URL` apuntando a `localhost:4000`.
+- Migración `20260826233443_init` generada y aplicada — las 6 tablas están en la BD.
+- Prisma Client generado (`node_modules/@prisma/client`).
 
 ## Pendientes / Próximo paso
 
-- [ ] Generar la primera migración de Prisma (`npx prisma migrate dev`).
-- [ ] Verificar que la migración crea las tablas correctamente en la BD.
 - [ ] Luego: Fase 2 (dominio + manejo de errores), Fase 3 (auth)...
 
 ## Decisiones de arquitectura (para no re-discutir)
