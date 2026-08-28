@@ -1,14 +1,15 @@
 # Cuentas Claras API — Checkpoint de Desarrollo
 
-> Estado guardado al **26 de agosto de 2026**. Este archivo documenta el avance para poder retomar el trabajo en otra sesión.
+> Estado guardado al **27 de agosto de 2026**. Este archivo documenta el avance para poder retomar el trabajo en otra sesión.
 
 ## Fase actual
 
-**Fase 1: Setup y Base de Datos** — completada.
+**Fase 2: Dominio y Manejo de Errores** — en progreso.
 
 ## Completado ✅
 
 ### Configuración base
+
 - `package.json` con `"type": "module"` (ESM) y scripts:
   - `dev`: `tsx watch src/server.ts`
   - `build`: `tsc --project tsconfig.json`
@@ -30,11 +31,13 @@
 - `.gitignore` creado: excluye `node_modules/`, `dist/`, `.env`, logs, editores.
 
 ### Código verificado
+
 - `src/app.ts`: instancia Express + `app.use(express.json())`, export default.
 - `src/server.ts`: `port = 3000`, `app.listen` con log en español, y listener `server.on('error')` con `process.exit(1)` para puerto ocupado (error asíncrono, por eso NO se usa try/catch).
 - `npm run build` compila sin errores.
 
 ### Base de datos (Docker)
+
 - Docker Desktop 4.86.0 instalado en `C:\Users\Santi\AppData\Local\Programs\DockerDesktop` (NO en Program Files).
 - El comando `docker` requiere PATH actualizado: cerrar/reabrir terminal, o ruta completa `C:\Users\Santi\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe`.
 - `docker-compose.yml` en la raíz: Postgres 16, contenedor `cuentasclaras-postgres`, puerto host **4000** → 5432 interno, volumen `pgdata`.
@@ -42,6 +45,7 @@
 - Credenciales de dev: `POSTGRES_USER=admin`, `POSTGRES_PASSWORD=1144066482`, `POSTGRES_DB=cuentasclaras_dev`.
 
 ### Prisma
+
 - `prisma/schema.prisma` creado con **6 modelos** y relaciones definidas:
   - **User**: id (UUID), email (unique), name, password, createdAt, updatedAt.
   - **Household**: id (UUID), name, createdAt, updatedAt.
@@ -53,9 +57,28 @@
 - Migración `20260826233443_init` generada y aplicada — las 6 tablas están en la BD.
 - Prisma Client generado (`node_modules/@prisma/client`).
 
+### Entidades de Dominio (Fase 2 - incompleta)
+
+- `src/domain/entities/user.ts` — interfaz `User`: id, email, name.
+- `src/domain/entities/household.ts` — interfaz `Household`: id, name.
+- `src/domain/entities/expense.ts` — interfaz `Expense`: id, description, amount, paidBy, date, householdId.
+- `src/domain/entities/settlement.ts` — interfaz `Settlement`: id, amount, from, to, settled.
+- `src/domain/entities/expenseSplit.ts` — interfaz `ExpenseSplit`: userId, amount, paid.
+- `src/domain/entities/householdMember.ts` — interfaz `HouseholdMember`: userId, role.
+
+### Decisiones de diseño para entidades
+
+- Las entidades de dominio son interfaces TypeScript puras (sin decorators de Prisma).
+- Solo incluyen campos esenciales para el negocio (sin timestamps de BD).
+- `password` no va en el dominio (es de infraestructura/auth).
+- Relaciones se representan con IDs (strings), no con objetos anidados.
+- `HouseholdMember` no incluye `householdId` porque siempre se infiere del contexto.
+- `ExpenseSplit` no incluye `expenseId` porque se infiere del contexto del gasto padre.
+
 ## Pendientes / Próximo paso
 
-- [ ] Luego: Fase 2 (dominio + manejo de errores), Fase 3 (auth)...
+- [ ] Completar Fase 2: Middleware de Errores Global
+- [ ] Fase 3: Módulo de Autenticación (Register, Login, Refresh Token, Auth Middleware)
 
 ## Decisiones de arquitectura (para no re-discutir)
 
@@ -66,6 +89,8 @@
 - Logs en español, consistencia con el proyecto.
 - Dinero como `Int` en pesos COP (sin decimales).
 - IDs como UUID v4.
+- Naming de archivos: camelCase para archivos multi-palabra (`expenseSplit.ts`, `householdMember.ts`).
+- Interfaces en PascalCase (`ExpenseSplit`, `HouseholdMember`).
 
 ## Recordatorios
 
