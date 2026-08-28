@@ -4,7 +4,7 @@
 
 ## Fase actual
 
-**Fase 2: Dominio y Manejo de Errores** — en progreso.
+**Fase 3: Módulo de Autenticación** — en progreso.
 
 ## Completado ✅
 
@@ -32,7 +32,7 @@
 
 ### Código verificado
 
-- `src/app.ts`: instancia Express + `app.use(express.json())`, export default.
+- `src/app.ts`: instancia Express + `app.use(express.json())` + `app.use(ErrorHandler)`, export default.
 - `src/server.ts`: `port = 3000`, `app.listen` con log en español, y listener `server.on('error')` con `process.exit(1)` para puerto ocupado (error asíncrono, por eso NO se usa try/catch).
 - `npm run build` compila sin errores.
 
@@ -57,7 +57,7 @@
 - Migración `20260826233443_init` generada y aplicada — las 6 tablas están en la BD.
 - Prisma Client generado (`node_modules/@prisma/client`).
 
-### Entidades de Dominio (Fase 2 - incompleta)
+### Entidades de Dominio (Fase 2 - completa)
 
 - `src/domain/entities/user.ts` — interfaz `User`: id, email, name.
 - `src/domain/entities/household.ts` — interfaz `Household`: id, name.
@@ -75,10 +75,24 @@
 - `HouseholdMember` no incluye `householdId` porque siempre se infiere del contexto.
 - `ExpenseSplit` no incluye `expenseId` porque se infiere del contexto del gasto padre.
 
+### Manejo de Errores (Fase 2 - completa)
+
+- `src/domain/errors/AppError.ts` — clase que extiende `Error`:
+  - Propiedades públicas: `statusCode`, `code`, `message`, `details`.
+  - Constructor: `(statusCode, code, message, details?)` con `super(message)`.
+  - `details` opcional con default `{}`.
+- `src/interface/middlewares/errorHandler.ts` — middleware global de Express (4 parámetros):
+  - `if (err instanceof AppError)` → responde con `statusCode`, `code`, `message`, `details`.
+  - `else` → responde `500` `INTERNAL_SERVER_ERROR` con mensaje genérico.
+  - Usa `return res.status().json()` (corta la ejecución).
+  - `next` solo como parámetro para que Express lo identifique como error handler.
+- `src/app.ts` registra `app.use(ErrorHandler)` al final de la cadena de middlewares.
+- Se verificó que la app compila y levanta correctamente.
+
 ## Pendientes / Próximo paso
 
-- [ ] Completar Fase 2: Middleware de Errores Global
 - [ ] Fase 3: Módulo de Autenticación (Register, Login, Refresh Token, Auth Middleware)
+- [ ] Definir contrato de API de Auth (endpoints, request/response, códigos de error)
 
 ## Decisiones de arquitectura (para no re-discutir)
 
