@@ -1,6 +1,6 @@
 # Cuentas Claras API — Checkpoint de Desarrollo
 
-> Estado guardado al **27 de agosto de 2026**. Este archivo documenta el avance para poder retomar el trabajo en otra sesión.
+> Estado guardado al **2 de septiembre de 2026**. Este archivo documenta el avance para poder retomar el trabajo en otra sesión.
 
 ## Fase actual
 
@@ -89,10 +89,55 @@
 - `src/app.ts` registra `app.use(ErrorHandler)` al final de la cadena de middlewares.
 - Se verificó que la app compila y levanta correctamente.
 
+### Contrato de API (Creación de `API.md`)
+
+- Se creó `API.md` en la raíz con el contrato del primer endpoint: **`POST /v1/users`** (Registro).
+- Se decidió **documentar el contrato completo ANTES de implementar endpoints**, para tener una base probada y consistente.
+- El contrato usa **respuestas planas** (sin envelope `{error, data}`, sin repetir `statusCode` en el body).
+
+## Trabajo de hoy (2 de septiembre de 2026)
+
+- Definida la decisión de **empezar por el contrato de API** antes que por la implementación de endpoints, para validar formato de respuestas, errores y arquitectura sobre una base sólida.
+- Creado y revisado `API.md` con el endpoint `POST /v1/users`. Se evaluó el uso de bloques preformateados (code blocks) pero se **descartó**: se prefiere el formato plano para legibilidad.
+- Pendiente: **completar el contrato con los demás endpoints** antes de pasar a implementación.
+
+### Decisiones de diseño tomadas hoy (para no re-discutir)
+
+| Decisión                                        | Opción elegida                                                             |
+| ----------------------------------------------- | -------------------------------------------------------------------------- |
+| Respuestas exitosas                             | **Planas**, sin envelope `{error, data}`, sin repetir `statusCode`         |
+| Formato de error                                | Estándar del README: `{ error: { code, message, details } }`               |
+| Códigos de `POST /v1/users`                     | `201 Created` / `409 USER_ALREADY_EXISTS` / `422 VALIDATION_ERROR`         |
+| Header `Location`                               | En respuesta 201: `Location: /v1/users/{id}`                               |
+| Campos _Confirm_ (emailConfirm/passwordConfirm) | Solo **validan** (deben coincidir con su base), NO se persisten            |
+| Validación de esquema (Zod)                     | Se documenta **solo en el código** del validador, NO en `API.md`           |
+| Middleware de validación                        | **Genérico reutilizable** (`validate(schema)`), no incrustado en cada ruta |
+| Ubicación del validador                         | `src/interface/validators/createUserValidator.ts`                          |
+
+### Contrato del endpoint `POST /v1/users` (resumen)
+
+**Request body:** `email`, `emailConfirm`, `password`, `passwordConfirm`, `name`.
+**Response 201:** plano `{ email, message }` + header `Location: /v1/users/{id}`.
+**Errores:** `409 USER_ALREADY_EXISTS` y `422 VALIDATION_ERROR` (formato `{ error: {...} }`).
+
 ## Pendientes / Próximo paso
 
-- [ ] Fase 3: Módulo de Autenticación (Register, Login, Refresh Token, Auth Middleware)
-- [ ] Definir contrato de API de Auth (endpoints, request/response, códigos de error)
+- [ ] **Terminar el contrato de API** en `API.md` añadiendo los demás endpoints (candidatos, por decidir/ajustar):
+  - Auth: Login, Refresh Token.
+  - Usuarios: GET `/v1/users/:id`.
+  - Hogares: crear, unirse por `inviteCode`, listar, detalle.
+  - Gastos: crear (split EQUAL / PERCENTAGE / EXACT), listar por hogar.
+  - Balances: cálculo de deudas (`balance.service.ts`).
+  - Liquidaciones: registro de `Settlements`.
+- [ ] **Después del contrato:** implementar el flujo completo de **todos** los endpoints, **empezando por `POST /v1/users`** (Registro).
+
+### Flujo de implementación acordado (para `POST /v1/users` como plantilla)
+
+Express route → middleware validate(Zod) → controlador → caso de uso → repositorio Prisma → BD
+
+- Archivo del validador: `src/interface/validators/createUserValidator.ts`.
+- Middleware de validación genérico reutilizable (`validate(schema)`), NO incrustado en cada ruta.
+- El esquema Zod (mínimos, formato email, coincidencia de confirmaciones) vive solo en el código.
 
 ## Decisiones de arquitectura (para no re-discutir)
 
@@ -103,8 +148,10 @@
 - Logs en español, consistencia con el proyecto.
 - Dinero como `Int` en pesos COP (sin decimales).
 - IDs como UUID v4.
-- Naming de archivos: camelCase para archivos multi-palabra (`expenseSplit.ts`, `householdMember.ts`).
+- Naming de archivos: camelCase para archivos multi-palabra (`expenseSplit.ts`, `householdMember.ts`, `createUserValidator.ts`).
 - Interfaces en PascalCase (`ExpenseSplit`, `HouseholdMember`).
+- Respuestas de éxito planas; formato de error `{ error: { code, message, details } }`.
+- El contrato de API se documenta en `API.md`; los detalles de validación Zod solo en el código.
 
 ## Recordatorios
 
