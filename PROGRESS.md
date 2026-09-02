@@ -91,7 +91,7 @@
 
 ### Contrato de API (Creación de `API.md`)
 
-- Se creó `API.md` en la raíz con el contrato del primer endpoint: **`POST /v1/users`** (Registro).
+- Se creó `API.md` en la raíz con el contrato de los endpoints definidos a la fecha.
 - Se decidió **documentar el contrato completo ANTES de implementar endpoints**, para tener una base probada y consistente.
 - El contrato usa **respuestas planas** (sin envelope `{error, data}`, sin repetir `statusCode` en el body).
 
@@ -99,7 +99,13 @@
 
 - Definida la decisión de **empezar por el contrato de API** antes que por la implementación de endpoints, para validar formato de respuestas, errores y arquitectura sobre una base sólida.
 - Creado y revisado `API.md` con el endpoint `POST /v1/users`. Se evaluó el uso de bloques preformateados (code blocks) pero se **descartó**: se prefiere el formato plano para legibilidad.
-- Pendiente: **completar el contrato con los demás endpoints** antes de pasar a implementación.
+- **Módulo de autenticación documentado en `API.md`** (4 endpoints):
+  - `POST /v1/users` — Registro.
+  - `POST /v1/auth/login` — Login (devuelve solo tokens: `{ accessToken, refreshToken }`).
+  - `GET /v1/users/:id` — Perfil (protegido, solo el propio usuario, perfil simple `{ id, email, name }`).
+  - `POST /v1/auth/refresh` — Refresh token (body: `{ refreshToken }`, devuelve nuevos tokens).
+- **GitHub:** se mergeó `feat/domain-entities` a `main` (fast-forward). El contrato se trabaja en la rama `feat/api-contract`.
+- Pendiente: **completar el contrato con los demás endpoints** (siguiente: households) antes de pasar a implementación.
 
 ### Decisiones de diseño tomadas hoy (para no re-discutir)
 
@@ -113,22 +119,27 @@
 | Validación de esquema (Zod)                     | Se documenta **solo en el código** del validador, NO en `API.md`           |
 | Middleware de validación                        | **Genérico reutilizable** (`validate(schema)`), no incrustado en cada ruta |
 | Ubicación del validador                         | `src/interface/validators/createUserValidator.ts`                          |
+| Response de Login / Refresh                     | **Solo tokens**, planos `{ accessToken, refreshToken }`                    |
+| Perfil `GET /v1/users/:id`                      | **Simple**: `{ id, email, name }`, solo el propio usuario, sin recursos    |
+| Auth: acceso a recurso de otro                  | `403 FORBIDDEN`                                                            |
+| Código de error de credenciales inválidas       | `401 INVALID_CREDENTIALS`                                                  |
+| Refresh token inválido/expirado                 | `401 INVALID_REFRESH_TOKEN`                                                |
 
-### Contrato del endpoint `POST /v1/users` (resumen)
+### Contratos de autenticación documentados (resumen)
 
-**Request body:** `email`, `emailConfirm`, `password`, `passwordConfirm`, `name`.
-**Response 201:** plano `{ email, message }` + header `Location: /v1/users/{id}`.
-**Errores:** `409 USER_ALREADY_EXISTS` y `422 VALIDATION_ERROR` (formato `{ error: {...} }`).
+- **`POST /v1/users` (201):** body `email/emailConfirm/password/passwordConfirm/name` → `{ email, message }` + `Location`. Errores: `409 USER_ALREADY_EXISTS`, `422 VALIDATION_ERROR`.
+- **`POST /v1/auth/login` (200):** body `email/password` → `{ accessToken, refreshToken }`. Errores: `401 INVALID_CREDENTIALS`, `422 VALIDATION_ERROR`.
+- **`GET /v1/users/:id` (200):** `{ id, email, name }`. Errores: `403 FORBIDDEN`, `404 NOT_FOUND`, `401 UNAUTHORIZED`, `422 VALIDATION_ERROR`.
+- **`POST /v1/auth/refresh` (200):** body `{ refreshToken }` → `{ accessToken, refreshToken }`. Errores: `401 INVALID_REFRESH_TOKEN`, `422 VALIDATION_ERROR`.
 
 ## Pendientes / Próximo paso
 
-- [ ] **Terminar el contrato de API** en `API.md` añadiendo los demás endpoints (candidatos, por decidir/ajustar):
-  - Auth: Login, Refresh Token.
-  - Usuarios: GET `/v1/users/:id`.
-  - Hogares: crear, unirse por `inviteCode`, listar, detalle.
-  - Gastos: crear (split EQUAL / PERCENTAGE / EXACT), listar por hogar.
-  - Balances: cálculo de deudas (`balance.service.ts`).
-  - Liquidaciones: registro de `Settlements`.
+- [x] **Contrato de autenticación completo** (`POST /v1/users`, `POST /v1/auth/login`, `GET /v1/users/:id`, `POST /v1/auth/refresh`).
+- [ ] **Siguiente: Hogares (Households)** en `API.md`:
+  - Crear hogar.
+  - Unirse a hogar por `inviteCode`.
+  - Listar hogares / detalle.
+- [ ] Hogares que faltan ajustar: gastos, balances, liquidaciones.
 - [ ] **Después del contrato:** implementar el flujo completo de **todos** los endpoints, **empezando por `POST /v1/users`** (Registro).
 
 ### Flujo de implementación acordado (para `POST /v1/users` como plantilla)
