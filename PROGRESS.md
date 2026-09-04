@@ -124,6 +124,18 @@
 | Auth: acceso a recurso de otro                  | `403 FORBIDDEN`                                                            |
 | Código de error de credenciales inválidas       | `401 INVALID_CREDENTIALS`                                                  |
 | Refresh token inválido/expirado                 | `401 INVALID_REFRESH_TOKEN`                                                |
+| Código de invitación (`inviteCode`)             | Campo único en `Household`, auto-generado (8 chars criptográficos)         |
+| Crear hogar (quién puede)                       | Cualquier usuario autenticado; el creador queda `admin` automáticamente    |
+| Unirse a hogar                                 | Por `inviteCode`, sin intervención del admin; el que se une queda `member` |
+| `inviteCode` en respuestas                      | Solo visible para `admin` (listar/detalle); el creador lo recibe al crear  |
+| Listas de colección                             | Envuelta en clave (`{ "households": [...] }`), NO array raíz (extensible a paginación) |
+| Códigos de error Hogares                        | `404 INVALID_INVITE_CODE` (join), `409 ALREADY_MEMBER` (join), `403 FORBIDDEN` (no miembro) |
+| Estrategias de división                          | EQUAL, PERCENTAGE, EXACT; se persisten en `Expense.strategy` y `ExpenseSplit.percent`      |
+| Crear gasto sin splits                           | EQUAL automático entre todos los miembros actuales                                         |
+| Editar/borrar gasto                              | Solo el `paidBy` (creador). `paidBy` no cambia por `PATCH`. Splits en PATCH = reemplazo completo |
+| Marcar split pagado                              | `PATCH /v1/expense-splits/:expenseId/:userId`, propio usuario o admin del hogar            |
+| Id del split en la API                           | Cada split debe exponer un `id` propio en la respuesta (requiere migración de `ExpenseSplit`) |
+| Divisiones parciales (centavos) en EQUAL         | Se reparte el remanente al primer split / sobrante redondeado al primer usuario           |
 
 ### Contratos de autenticación documentados (resumen)
 
@@ -135,10 +147,23 @@
 ## Pendientes / Próximo paso
 
 - [x] **Contrato de autenticación completo** (`POST /v1/users`, `POST /v1/auth/login`, `GET /v1/users/:id`, `POST /v1/auth/refresh`).
-- [ ] **Siguiente: Hogares (Households)** en `API.md`:
-  - Crear hogar.
-  - Unirse a hogar por `inviteCode`.
-  - Listar hogares / detalle.
+- [x] **Contrato de Hogares (Households) en `API.md`** (4 endpoints):
+  - `POST /v1/households` — Crear hogar (body `{ name }`, creador queda `admin`, genera `inviteCode`).
+  - `POST /v1/households/join` — Unirse con `{ inviteCode }`.
+  - `GET /v1/households` — Listar hogares del usuario (con su `role`; `inviteCode` solo si es admin).
+  - `GET /v1/households/:id` — Detalle con miembros; `inviteCode` solo si es admin.
+- [x] **Contrato de Gastos (Expenses) en `API.md`** (6 endpoints):
+  - `POST /v1/households/:householdId/expenses` — Crear gasto (strategy EQUAL/PERCENTAGE/EXACT; sin splits = EQUAL entre todos).
+  - `GET /v1/households/:householdId/expenses` — Listar (nuevos primero, sin splits).
+  - `GET /v1/expenses/:id` — Detalle con splits.
+  - `PATCH /v1/expenses/:id` — Editar cabecera (solo `paidBy`; si envía splits, reemplazo completo).
+  - `DELETE /v1/expenses/:id` — Borrar (solo `paidBy`).
+  - `PATCH /v1/expense-splits/:expenseId/:userId` — Marcar split pagado/no (propio usuario o admin del hogar).
+- [x] **Cambio de esquema Prisma requerido por el contrato:** agregado `inviteCode String @unique` a `Household` + migración `20260904120000_add_invite_code` aplicada (BD vacía, sin conflictos). Cliente regenerado.
+- [x] **Esquema de Gastos (soporta el contrato de estrategias):** migración `20260904130000_expense_strategy_and_split_id` aplicada:
+  - `Expense`: + `title Text?`, `strategy Text @default("EQUAL")`.
+  - `ExpenseSplit`: + `id String @id @default(uuid())` (PK propia), + `percent Int?`, y `@@unique([expenseId, userId])` (antes PK compuesta). BD vacía → cambio de PK sin riesgo.
+- [ ] **Módulo de Balances y Liquidaciones — contrato pendiente** en `API.md`: cálculo de deudas, `POST /v1/households/:householdId/settlements`.
 - [ ] Hogares que faltan ajustar: gastos, balances, liquidaciones.
 - [ ] **Después del contrato:** implementar el flujo completo de **todos** los endpoints, **empezando por `POST /v1/users`** (Registro).
 
