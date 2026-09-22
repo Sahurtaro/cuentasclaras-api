@@ -136,6 +136,11 @@
 | Marcar split pagado                              | `PATCH /v1/expense-splits/:expenseId/:userId`, propio usuario o admin del hogar            |
 | Id del split en la API                           | Cada split debe exponer un `id` propio en la respuesta (requiere migración de `ExpenseSplit`) |
 | Divisiones parciales (centavos) en EQUAL         | Se reparte el remanente al primer split / sobrante redondeado al primer usuario           |
+| Balance: qué contabiliza                        | `alreadyPaid` = splits propios `paid`; `pending` = splits propios sin pagar; `net` = me deben − debo; `debts` = solo deuda saliente por par agregado |
+| Split del `paidBy`                              | Nace `paid: true` al crear el gasto (quien paga ya cubrió su parte)                       |
+| Liquidación: monto                              | Debe ser EXACTAMENTE la deuda pendiente total `from`→`to`; si no → `422 SETTLEMENT_MISMATCH` |
+| Liquidación: efecto                             | Registro informativo + marca `paid: true` todos los splits impagos de `from` en gastos de `to` |
+| Settlements: endpoint extra                     | `GET /v1/households/:householdId/settlements` — listado, nuevos primero; sin `GET` por id |
 
 ### Contratos de autenticación documentados (resumen)
 
@@ -163,9 +168,21 @@
 - [x] **Esquema de Gastos (soporta el contrato de estrategias):** migración `20260904130000_expense_strategy_and_split_id` aplicada:
   - `Expense`: + `title Text?`, `strategy Text @default("EQUAL")`.
   - `ExpenseSplit`: + `id String @id @default(uuid())` (PK propia), + `percent Int?`, y `@@unique([expenseId, userId])` (antes PK compuesta). BD vacía → cambio de PK sin riesgo.
-- [ ] **Módulo de Balances y Liquidaciones — contrato pendiente** en `API.md`: cálculo de deudas, `POST /v1/households/:householdId/settlements`.
+- [x] **Contrato de Balances y Liquidaciones en `API.md`** (3 endpoints):
+  - `GET /v1/households/:householdId/balance` — balance por miembro con `alreadyPaid`, `pending`, `net`, `debts` (por par agregado, solo deuda saliente; el split del `paidBy` nace `paid: true`).
+  - `POST /v1/households/:householdId/settlements` — body `{ from, to, amount }`; `amount` debe ser **exactamente** la deuda pendiente total entre `from`→`to` (si no → `422 SETTLEMENT_MISMATCH`); al crearlo se marcan como `paid` los splits impagos de `from`; registro informativo.
+  - `GET /v1/households/:householdId/settlements` — listado, nuevos primero.
 - [ ] Hogares que faltan ajustar: gastos, balances, liquidaciones.
 - [ ] **Después del contrato:** implementar el flujo completo de **todos** los endpoints, **empezando por `POST /v1/users`** (Registro).
+- [x] **⚠️ ORDEN ACORDADO (cumplido):** el contrato completo (auth + households + expenses + balances/settlements) quedó cerrado en `API.md`. Antes de implementar cualquier endpoint ya no queda contrato pendiente.
+- [x] **Mock API para el frontend (pendiente de arrancar, NO es implementación de negocio):** el amigo que hace el front necesita consumir datos para pruebas. Decisión tomada: **rutas Express reales con controladores mock** (no `json-server`).
+  - Condición cumplida: **Balances y Liquidaciones ya están cerrados** en `API.md`, el mock puede cubrir todo el contrato.
+  - Esqueleto de rutas con los paths/métodos del contrato en `src/interface/routes/`.
+  - Controladores que devuelven datos de archivos estáticos en `src/interface/mocks/` (`*.json` con seeds consistentes: usuarios, hogares, gastos, splits).
+  - Sin BD, sin bcrypt; auth middleware **falso/deshabilitado** (deja pasar) mientras sea mock.
+  - Cuando se implemente el endpoint real, se reemplaza el cuerpo del controlador por el caso de uso (las rutas no cambian).
+  - Nota: esto es scaffolding para el front, se marca aparte de la implementación real.
+- [ ] **▶ SIGUIENTE TAREA: Mock API para el frontend.** Arrancar con el esqueleto de rutas en `src/interface/routes/` con los paths/métodos del contrato completo (`API.md`), y luego los controladores mock en `src/interface/mocks/` (`*.json` con seeds consistentes).
 
 ### Flujo de implementación acordado (para `POST /v1/users` como plantilla)
 

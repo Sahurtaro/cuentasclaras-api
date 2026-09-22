@@ -382,3 +382,105 @@ Marks a user's split of an expense as paid (or unpaid). Only the user themself o
 { "error": { "code": "NOT_FOUND", "message": "Expense or split not found", "details": {} } }
 { "error": { "code": "FORBIDDEN", "message": "You are not the owner of this split or an admin of the household", "details": {} } }
 { "error": { "code": "VALIDATION_ERROR", "message": "Please provide a valid paid value", "details": {} } }
+
+## Get household balance
+
+**GET /v1/households/:householdId/balance**
+
+Returns the balance of every member of the household, computed only from the unpaid splits (paid splits disappear, so settlements reduce balances automatically). Members are returned in joining order (`joinedAt`).
+
+Per member:
+- `alreadyPaid`: the sum of their own splits already marked as `paid` (what they have already covered from their share).
+- `pending`: the sum of their own splits still unpaid (what they still owe).
+- `net`: money owed TO them minus money they owe. Positive means they are owed; negative means they owe.
+- `debts`: the member's outgoing debts aggregated per pair (`from` owes `to`). It only lists what the member has to pay, not what others owe them.
+
+When a member creates an expense, their own split is created with `paid: true` (they already gave the money), so it counts as `alreadyPaid` and never appears in `debts`.
+
+### Response 200 OK
+
+{
+"balance": [
+  {
+    "memberId": "<uuid>",
+    "name": "Juan Pérez",
+    "alreadyPaid": 10000,
+    "pending": 0,
+    "net": 20000,
+    "debts": []
+  },
+  {
+    "memberId": "<uuid>",
+    "name": "Ana López",
+    "alreadyPaid": 0,
+    "pending": 20000,
+    "net": -20000,
+    "debts": [
+      { "from": "<uuid>", "to": "<uuid>", "amount": 20000 }
+    ]
+  }
+]
+}
+
+Example: expense "Mercado" of 30000 paid by Juan, with splits 10000 (Juan, paid) and 20000 (Ana, unpaid).
+
+### Errors
+
+{ "error": { "code": "UNAUTHORIZED", "message": "Authentication required", "details": {} } }
+{ "error": { "code": "NOT_FOUND", "message": "Household not found", "details": {} } }
+{ "error": { "code": "FORBIDDEN", "message": "You are not a member of this household", "details": {} } }
+{ "error": { "code": "VALIDATION_ERROR", "message": "Please provide a valid household id", "details": {} } }
+
+## Create settlement
+
+**POST /v1/households/:householdId/settlements**
+
+Records a settlement between two members and automatically marks as `paid` every unpaid split of `from` in expenses paid by `to`. The `amount` must be EXACTLY the full pending debt of `from` towards `to`. Partial or larger amounts are rejected with `SETTLEMENT_MISMATCH`. The settlement is a historical record only (it has no effect on the expense amounts).
+
+### Request — Body (application/json)
+
+{
+"from": "<uuid>",
+"to": "<uuid>",
+"amount": 20000
+}
+
+### Response 201 Created
+
+{
+"id": "<uuid>",
+"from": "<uuid>",
+"to": "<uuid>",
+"amount": 20000,
+"createdAt": "2026-09-05T10:00:00Z"
+}
+
+### Errors
+
+{ "error": { "code": "UNAUTHORIZED", "message": "Authentication required", "details": {} } }
+{ "error": { "code": "NOT_FOUND", "message": "Household not found", "details": {} } }
+{ "error": { "code": "FORBIDDEN", "message": "You are not a member of this household", "details": {} } }
+{ "error": { "code": "USER_NOT_MEMBER", "message": "One or both participants are not members of this household", "details": {} } }
+{ "error": { "code": "SETTLEMENT_MISMATCH", "message": "The amount does not match the pending debt", "details": {} } }
+{ "error": { "code": "VALIDATION_ERROR", "message": "Please provide a valid settlement format", "details": {} } }
+
+## List settlements
+
+**GET /v1/households/:householdId/settlements**
+
+Lists the settlements of the household, newest first.
+
+### Response 200 OK
+
+{
+"settlements": [
+  { "id": "<uuid>", "from": "<uuid>", "to": "<uuid>", "amount": 20000, "createdAt": "2026-09-05T10:00:00Z" }
+]
+}
+
+### Errors
+
+{ "error": { "code": "UNAUTHORIZED", "message": "Authentication required", "details": {} } }
+{ "error": { "code": "NOT_FOUND", "message": "Household not found", "details": {} } }
+{ "error": { "code": "FORBIDDEN", "message": "You are not a member of this household", "details": {} } }
+{ "error": { "code": "VALIDATION_ERROR", "message": "Please provide a valid household id", "details": {} } }
