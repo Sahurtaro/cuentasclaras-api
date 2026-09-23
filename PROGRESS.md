@@ -1,6 +1,6 @@
 # Cuentas Claras API — Checkpoint de Desarrollo
 
-> Estado guardado al **2 de septiembre de 2026**. Este archivo documenta el avance para poder retomar el trabajo en otra sesión.
+> Estado guardado al **23 de septiembre de 2026**. Este archivo documenta el avance para poder retomar el trabajo en otra sesión.
 
 ## Fase actual
 
@@ -149,6 +149,29 @@
 - **`GET /v1/users/:id` (200):** `{ id, email, name }`. Errores: `403 FORBIDDEN`, `404 NOT_FOUND`, `401 UNAUTHORIZED`, `422 VALIDATION_ERROR`.
 - **`POST /v1/auth/refresh` (200):** body `{ refreshToken }` → `{ accessToken, refreshToken }`. Errores: `401 INVALID_REFRESH_TOKEN`, `422 VALIDATION_ERROR`.
 
+## Trabajo de hoy (23 de septiembre de 2026)
+
+- **Mock API para el frontend terminada** (rutas + controladores + seeds). Los 17 endpoints del contrato responden y `npm run build` compila.
+- **Estructura creada:**
+  - `src/interface/mocks/data/` — 6 seeds JSON consistentes: `users.json`, `households.json`, `members.json` (N:M con role y joinedAt), `expenses.json`, `splits.json` (con `id`, `percent`, `paid`), `settlements.json`.
+  - `src/interface/mocks/db.ts` — carga los JSON con `new URL(..., import.meta.url)` (resuelve rutas sin depender del cwd) y expone arrays mutables + `MOCK_CURRENT_USER_ID` (Juan, el "usuario logueado" del mock) + helper `membersOfHousehold`.
+  - `src/interface/mocks/controllers/` — `authController.ts`, `userController.ts`, `householdController.ts`, `expenseController.ts`, `settlementController.ts`, `balanceController.ts`.
+  - `src/interface/middlewares/fakeAuth.ts` — deja pasar; punto único a reemplazar por el auth JWT real.
+  - `src/interface/routes/` — `authRoutes.ts`, `userRoutes.ts`, `householdRoutes.ts`, `expenseRoutes.ts`, `settlementRoutes.ts`, montados en `app.ts` bajo `app.use('/v1', ...)`.
+- **Decisiones de diseño tomadas hoy (para no re-discutir):**
+
+| Decisión                        | Opción elegida                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `POST /v1/users` (registro)     | Vive en `authRoutes.ts` (público), antes del `FakeAuth`; `GET /v1/users/:id` en `userRoutes.ts` (protegido). Separación lista para el auth real |
+| Orden en `app.ts`               | Routers públicos → `FakeAuth` → routers protegidos → `ErrorHandler` al final                    |
+| Data del mock                   | Arrays mutables en memoria (NO se persiste a disco); `randomUUID()` para IDs nuevos; `inviteCode` generado (8 chars) |
+| Balance                         | Se calcula dinámicamente desde splits: `alreadyPaid`/`pending` del propio miembro; `net` = lo que me deben − lo que debo (solo splits impagos); `debts` por par agregado de deuda saliente |
+| Ruta del balance                | `/households/:householdId/balance` (param `:householdId`, igual que el contrato y el handler) |
+| `MOCK_CURRENT_USER_ID`          | Fijo = Juan (`11111111-...`). El front prueba siempre como Juan (los sets del mock no cambian de sesión) |
+| Limitación conocida             | `npm run start` (sobre `dist/`) NO encuentra los JSON (no se copian al build). El mock corre con `npm run dev` (tsx) |
+
+- **Nota debugging:** los `500 INTERNAL_SERVER_ERROR` durante las pruebas eran artefactos del quoting de PowerShell en `curl` (JSON roto → error del body-parser), NO bugs del código. Se confirmó enviando cuerpos desde archivos JSON generados con `ConvertTo-Json`.
+
 ## Pendientes / Próximo paso
 
 - [x] **Contrato de autenticación completo** (`POST /v1/users`, `POST /v1/auth/login`, `GET /v1/users/:id`, `POST /v1/auth/refresh`).
@@ -182,7 +205,8 @@
   - Sin BD, sin bcrypt; auth middleware **falso/deshabilitado** (deja pasar) mientras sea mock.
   - Cuando se implemente el endpoint real, se reemplaza el cuerpo del controlador por el caso de uso (las rutas no cambian).
   - Nota: esto es scaffolding para el front, se marca aparte de la implementación real.
-- [ ] **▶ SIGUIENTE TAREA: Mock API para el frontend.** Arrancar con el esqueleto de rutas en `src/interface/routes/` con los paths/métodos del contrato completo (`API.md`), y luego los controladores mock en `src/interface/mocks/` (`*.json` con seeds consistentes).
+- [x] **▶ Mock API para el frontend (completada).** Esqueleto de rutas en `src/interface/routes/` con los paths/métodos del contrato completo (`API.md`) + controladores mock en `src/interface/mocks/` (`*.json` con seeds consistentes). Los 17 endpoints responden; al implementar cada endpoint real solo se reemplaza el cuerpo del controlador (las rutas no cambian).
+- [ ] **▶ SIGUIENTE TAREA: Implementar `POST /v1/users` (Registro) real.** Flujo: Express route (ya existe) → middleware `validate(Zod)` → controlador → caso de uso → repositorio Prisma. El validador vive en `src/interface/validators/createUserValidator.ts`.
 
 ### Flujo de implementación acordado (para `POST /v1/users` como plantilla)
 
