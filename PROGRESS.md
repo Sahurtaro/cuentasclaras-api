@@ -206,7 +206,7 @@
   - Cuando se implemente el endpoint real, se reemplaza el cuerpo del controlador por el caso de uso (las rutas no cambian).
   - Nota: esto es scaffolding para el front, se marca aparte de la implementación real.
 - [x] **▶ Mock API para el frontend (completada).** Esqueleto de rutas en `src/interface/routes/` con los paths/métodos del contrato completo (`API.md`) + controladores mock en `src/interface/mocks/` (`*.json` con seeds consistentes). Los 17 endpoints responden; al implementar cada endpoint real solo se reemplaza el cuerpo del controlador (las rutas no cambian).
-- [ ] **▶ SIGUIENTE TAREA: Implementar `POST /v1/users` (Registro) real.** Flujo: Express route (ya existe) → middleware `validate(Zod)` → controlador → caso de uso → repositorio Prisma. El validador vive en `src/interface/validators/createUserValidator.ts`.
+- [~] **▶ EN CURSO: Implementar `POST /v1/users` (Registro) real.** Ver la sección "Trabajo de hoy (15 de octubre de 2026)" más abajo para el detalle y los pendientes. Flujo: Express route (ya existe) → middleware `validate(Zod)` → controlador → caso de uso → repositorio Prisma. Hecho: middleware `validate`, validador Zod y puertos. Falta: caso de uso, adaptadores Prisma/bcrypt, controlador y cableado de la ruta.
 
 ### Flujo de implementación acordado (para `POST /v1/users` como plantilla)
 
@@ -215,6 +215,53 @@ Express route → middleware validate(Zod) → controlador → caso de uso → r
 - Archivo del validador: `src/interface/validators/createUserValidator.ts`.
 - Middleware de validación genérico reutilizable (`validate(schema)`), NO incrustado en cada ruta.
 - El esquema Zod (mínimos, formato email, coincidencia de confirmaciones) vive solo en el código.
+
+## Trabajo de hoy (15 de octubre de 2026)
+
+Rama actual: `feat/mock-api`. Cambio de modalidad de la IA: **Modo Tutorial** (ver `README.md`). La IA explica qué hacer, cómo y por qué, y sugiere el código; **el desarrollador escribe el código** (la IA solo escribe si se lo piden explícitamente).
+
+### Completado ✅
+
+- **`README.md` actualizado:** la sección "🤖 Guía de Interacción con OpenCode" pasó de "Modo Tutor Socrático" a **Modo Tutorial**, con reglas: explicar qué/cómo/por qué, sugerir código, esperar a que el dev lo escriba y revisarlo, y solo escribir si se pide explícitamente.
+- **Middleware `validate` genérico:** `src/interface/middlewares/validate.ts`.
+  - Firma: `validate(schema, message = 'Please provide a valid format')` → fábrica de middlewares.
+  - `safeParse(req.body)`; si falla lanza `AppError(422, 'VALIDATION_ERROR', message, result.error.flatten())`; si ok, `req.body = result.data` y `next()`.
+  - Express 5 (instalado) captura los `throw` de middlewares sync automáticamente → llegan al `ErrorHandler`.
+  - El `message` es parametrizable porque cada endpoint tiene su mensaje en `API.md`.
+- **Validador del registro:** `src/interface/validators/createUserValidator.ts`.
+  - `createUserSchema`: `email` (`.email()`), `emailConfirm` (`.email()`), `password` (`.min(8)`), `passwordConfirm` (string), `name` (`.min(1)`).
+  - Dos `.refine()` cruzados: email↔emailConfirm (path `emailConfirm`) y password↔passwordConfirm (path `passwordConfirm`). Los "Confirm" solo validan, no se persisten.
+  - Exporta `type CreateUserBody = z.infer<typeof createUserSchema>`.
+- **Puertos (capa aplicación):** `src/application/ports/`.
+  - `UserRepository.ts`: `interface UserRecord extends User { passwordHash: string }` + `interface UserRepository { findByEmail(email): Promise<UserRecord | null>; create(user, passwordHash): Promise<void> }`.
+  - `PasswordHasher.ts`: `interface PasswordHasher { hash(plain): Promise<string>; compare(plain, hash): Promise<boolean> }`.
+- `npm run build` compila sin errores.
+
+### Decisiones de diseño tomadas hoy (para no re-discutir)
+
+| Decisión | Opción elegida |
+| --- | --- |
+| Estilo de interacción IA | **Modo Tutorial** (explica y sugiere; el dev escribe) |
+| `id` del usuario al crear | Se genera en la **capa aplicación** con `randomUUID()` (opción a) y se pasa dentro del `User`; `create` del puerto devuelve `Promise<void>` |
+| Hash de contraseña | Detrás del puerto `PasswordHasher` (no bcrypt directo en el caso de uso) |
+| Interfaces/puertos | Viven en `src/application/ports/` (puertos adentro, adaptadores en `infra`) |
+| `UserRecord` | Tipo del puerto = entidad `User` + `passwordHash`; NO contamina `domain/entities/user.ts` |
+| `PasswordHasher` | Se define el contrato ahora; la implementación `BcryptPasswordHasher` se hará después en `infra` |
+
+### Pendientes / Próxima sesión
+
+- [ ] **Escribir el caso de uso `src/application/use-cases/createUser.ts`** (orquestador). Estilo elegido por decidir: **fábrica** (`createUser(userRepo, hasher) → async (input) => User`) recomendada, o clase. Lógica: `findByEmail` → si existe `AppError(409, 'USER_ALREADY_EXISTS', ...)` → `randomUUID()` → `hasher.hash` → construir `User` → `repo.create` → devolver `User`. No incluye los campos "Confirm" (solo son de validación).
+- [ ] **Implementar el adaptador** `src/infrastructure/db/PrismaUserRepository.ts` (implementa `UserRepository` con Prisma + `bcrypt`/hash).
+- [ ] **Implementar el adaptador** `src/infrastructure/auth/BcryptPasswordHasher.ts` (implementa `PasswordHasher`). Verificar que `bcrypt` esté instalado; si no, `npm i bcrypt` + `@types/bcrypt`.
+- [ ] **Controlador real** de registro (reemplaza el mock en `src/interface/mocks/controllers/userController.ts`): extrae body, llama al caso de uso, responde `201` + header `Location: /v1/users/{id}` + `{ email, message }`.
+- [ ] **Cablear la ruta** en `authRoutes.ts`: `POST /users` con `validate(createUserSchema, 'Please provide a valid user format')` + controlador real (quitar el mock).
+- [ ] **Instanciar dependencias** (composición): dónde se crean `PrismaUserRepository`, `BcryptPasswordHasher` y el caso de uso (probablemente un módulo de composición o en el controlador).
+- [ ] Probar `POST /v1/users` end-to-end contra la BD del contenedor (crear usuario, verificar `409` con email repetido y `422` con body inválido).
+
+### Deuda / notas
+
+- ⚠️ **`README.md` corrupto:** contiene 21 bytes nulos (contenido UTF-16 mezclado al final). Git lo trata como binario. Arreglar reescribiendo el archivo limpio en UTF-8.
+- El mensaje del `validate` es parametrizable, pero cada ruta debe pasar su mensaje del contrato (`API.md`).
 
 ## Decisiones de arquitectura (para no re-discutir)
 
