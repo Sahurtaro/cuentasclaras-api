@@ -23,10 +23,11 @@ model User {
 }
 
 model Household {
-  id        String   @id @default(uuid())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid())
+  name        String
+  inviteCode  String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   members  HouseholdMember[]
   expenses Expense[]
@@ -50,6 +51,8 @@ model Expense {
   id          String   @id @default(uuid())
   description String
   amount      Int
+  title       String?
+  strategy    String   @default("EQUAL") // EQUAL | PERCENTAGE | EXACT
   paidBy      String   // userId de quien pagó
   date        DateTime @default(now())
   createdAt   DateTime @default(now())
@@ -63,14 +66,16 @@ model Expense {
 }
 
 model ExpenseSplit {
-  @@id([expenseId, userId])
-  amount Int
-  paid Boolean @default(false)
+  id        String   @id @default(uuid())
+  amount    Int
+  percent   Int?
+  paid      Boolean  @default(false)
   expenseId String
-  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
-  userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  expense   Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([expenseId, userId])
 }
 
 model Settlement {
